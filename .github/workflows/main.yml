@@ -1,0 +1,65 @@
+name: Databricks ETL CI/CD
+
+on:
+  push:
+    branches:
+      - main # Kjør denne arbeidsflyten hver gang det pushes til 'main'-branchen
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # Job for å kjøre tester (hvis du har testkode)
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    - name: Install dependencies
+      run: |
+        pip install databricks-cli requests pyspark matplotlib pandas
+    - name: Run Python tests (Example - replace with your actual test command)
+      # Hvis du hadde en `tests` mappe med pytest, f.eks.
+      # run: pytest tests/
+      run: echo "Running placeholder tests..." # Erstatt med dine faktiske tester
+
+  # Job for å deployere til Databricks og starte en jobb
+  deploy-and-run-databricks-job:
+    needs: run-tests # Denne jobben avhenger av at testene bestått
+    runs-on: ubuntu-latest
+    environment:
+      name: Development # Kan ha forskjellige miljøer (Dev, Test, Prod)
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Databricks CLI
+      run: pip install databricks-cli
+
+    - name: Configure Databricks CLI
+      env:
+        DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }} # Lagre som GitHub Secret
+        DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }} # Lagre som GitHub Secret
+      run: |
+        databricks configure --host $DATABRICKS_HOST --token $DATABRICKS_TOKEN
+
+    - name: Deploy Notebook to Databricks
+      run: |
+        # Anta at notebooken din ligger under 'notebooks/etl_pipeline.ipynb'
+        # Pass på at banen er korrekt i ditt repo
+        databricks workspace import --overwrite --format AUTO notebooks/Komplett_ETL_pipeline_for_parkeringsdata.py /Users/your.email@example.com/Komplett_ETL_pipeline_for_parkeringsdata # Erstatt med din Databricks-bane
+
+    - name: Run Databricks Job
+      # Dette forutsetter at du har definert en Databricks Jobb i Databricks-grensesnittet
+      # som peker til den deployerte notebooken.
+      # Du kan også opprette/oppdatere jobben programmatisk via CLI/API.
+      env:
+        DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+        DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      run: |
+        # Eksempel på å starte en eksisterende jobb.
+        # Du må finne Job ID-en for jobben din i Databricks
+        # Eller bruke `databricks jobs create` og `databricks jobs update`
+        databricks jobs run-now --job-id YOUR_DATABRICKS_JOB_ID # Erstatt med din Job ID
