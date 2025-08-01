@@ -10,7 +10,6 @@ schema = StructType([
     StructField("Antall_ledige_plasser", IntegerType(), True)
 ])
 
-df = spark.createDataFrame(data, schema=schema)
 
 @pytest.fixture(scope="session")
 def spark():
