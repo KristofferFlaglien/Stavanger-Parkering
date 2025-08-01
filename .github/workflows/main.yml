@@ -46,7 +46,7 @@ jobs:
 
     - name: Upload notebook (or Python script)
       run: |
-        databricks workspace import ./notebooks/Stavanger_parkering.py /Shared/Stavanger_parkering -f SOURCE -l PYTHON
+        databricks workspace import ./notebooks/Stavanger_parkering.py.ipynb /Shared/Stavanger_parkering -f SOURCE -l PYTHON
 
     - name: Run Databricks Job
       run: |
