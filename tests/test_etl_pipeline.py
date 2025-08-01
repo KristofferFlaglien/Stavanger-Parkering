@@ -1,6 +1,16 @@
 import pytest
 from pyspark.sql import SparkSession
 from etl_pipeline import sjekk_duplikater, valider_manglende, valider_gyldige_verdier, konverter_timestamp
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+
+schema = StructType([
+    StructField("Sted", StringType(), True),
+    StructField("Dato", StringType(), True),  # eller DateType hvis du bruker datoer senere
+    StructField("Klokkeslett", StringType(), True),
+    StructField("Antall_ledige_plasser", IntegerType(), True)
+])
+
+df = spark.createDataFrame(data, schema=schema)
 
 @pytest.fixture(scope="session")
 def spark():
@@ -14,7 +24,8 @@ def test_sjekk_duplikater(spark):
 
 def test_valider_manglende_feiler(spark):
     data = [("A", None, "10:00", 5)]
-    df = spark.createDataFrame(data, ["Sted", "Dato", "Klokkeslett", "Antall_ledige_plasser"])
+    df = spark.createDataFrame(data, schema=schema)
+    # df = spark.createDataFrame(data, ["Sted", "Dato", "Klokkeslett", "Antall_ledige_plasser"])
     with pytest.raises(ValueError):
         valider_manglende(df)
 
