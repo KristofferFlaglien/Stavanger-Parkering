@@ -1,0 +1,57 @@
+name: CI/CD Pipeline for Databricks
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        pip install pytest
+
+    - name: Run tests
+      run: pytest tests/
+
+  deploy:
+    name: Deploy to Databricks
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install Databricks CLI
+      run: |
+        pip install databricks-cli
+
+    - name: Configure Databricks CLI
+      run: |
+        databricks configure --token <<EOF
+        ${{ secrets.DATABRICKS_HOST }}
+        ${{ secrets.DATABRICKS_TOKEN }}
+        EOF
+
+    - name: Upload notebook (or Python script)
+      run: |
+        databricks workspace import ./notebooks/Stavanger_parkering.py /Shared/Stavanger_parkering -f SOURCE -l PYTHON
+
+    - name: Run Databricks Job
+      run: |
+        databricks jobs run-now --job-id 526219339235394
+
