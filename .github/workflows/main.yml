@@ -22,7 +22,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        pip install pytest
+        pip install pytest pyspark pandas matplotlib
 
     - name: Run tests
       run: pytest tests/
@@ -42,10 +42,7 @@ jobs:
 
     - name: Configure Databricks CLI
       run: |
-        databricks configure --token <<EOF
-        ${{ secrets.DATABRICKS_HOST }}
-        ${{ secrets.DATABRICKS_TOKEN }}
-        EOF
+        echo -e "${{ secrets.DATABRICKS_HOST }}\n${{ secrets.DATABRICKS_TOKEN }}" | databricks configure --token
 
     - name: Upload notebook (or Python script)
       run: |
