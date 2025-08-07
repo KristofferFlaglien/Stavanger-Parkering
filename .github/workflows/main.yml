@@ -48,7 +48,3 @@ jobs:
       run: |
         databricks workspace import ./notebooks/Stavanger_parkering.py.ipynb /Shared/Stavanger_parkering -f SOURCE -l PYTHON
 
-    - name: Run Databricks Job
-      run: |
-        databricks jobs run-now --job-id 526219339235394
-
