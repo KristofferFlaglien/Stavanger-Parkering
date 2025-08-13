@@ -1,0 +1,19 @@
+name: Deploy to Databricks Prod
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: pip install databricks-cli
+      - run: |
+          export DATABRICKS_HOST=${{ secrets.DATABRICKS_HOST }}
+          export DATABRICKS_TOKEN=${{ secrets.DATABRICKS_TOKEN }}
+      - run: |
+          databricks workspace import ./notebooks/Stavanger_parkering.ipynb /Shared/Stavanger_parkering_prod -f SOURCE -l PYTHON --overwrite
