@@ -11,9 +11,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+
       - run: pip install databricks-cli
+
       - run: |
           export DATABRICKS_HOST=${{ secrets.DATABRICKS_HOST }}
           export DATABRICKS_TOKEN=${{ secrets.DATABRICKS_TOKEN }}
-      - run: |
-          databricks workspace import ./notebooks/Stavanger_parkering.ipynb /Shared/Stavanger_parkering_prod -f SOURCE -l PYTHON --overwrite
+          for file in ./notebooks/*.ipynb; do
+            filename=$(basename "$file" .ipynb)
+            databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
+          done
+
+      - run: databricks jobs run-now --job-id 1067231731387433
