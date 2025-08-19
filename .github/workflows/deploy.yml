@@ -17,6 +17,15 @@ jobs:
 
       - run: pip install --upgrade databricks-cli
 
+      # Configure Databricks CLI
+      - run: |
+          mkdir -p ~/.databrickscfg
+          cat > ~/.databrickscfg << EOF
+          [DEFAULT]
+          host = ${{ secrets.DATABRICKS_HOST }}
+          token = ${{ secrets.DATABRICKS_TOKEN }}
+          EOF
+
       - run: |
           for file in ./notebooks/*.ipynb; do
             filename=$(basename "$file" .ipynb)
