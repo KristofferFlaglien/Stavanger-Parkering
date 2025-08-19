@@ -31,5 +31,3 @@ jobs:
             filename=$(basename "$file" .ipynb)
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
-
-      - run: databricks jobs run-now --job-id 1067231731387433
