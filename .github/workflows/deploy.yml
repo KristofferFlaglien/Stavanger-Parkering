@@ -8,14 +8,14 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:   # 👈 secrets live here, shared across steps
+    env:
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
 
     steps:
       - uses: actions/checkout@v3
 
-      - run: pip install databricks-cli
+      - run: pip install --upgrade databricks-cli
 
       - run: |
           for file in ./notebooks/*.ipynb; do
