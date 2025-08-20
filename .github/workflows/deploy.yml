@@ -28,3 +28,43 @@ jobs:
             filename=$(basename "$file" .ipynb)
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
+
+      - name: Deploy Lakeview dashboards (API method)
+        run: |
+          python - << 'EOF'
+          import requests
+          import json
+          import os
+          import glob
+
+          # Databricks connection details
+          host = os.environ['DATABRICKS_HOST']
+          token = os.environ['DATABRICKS_TOKEN']
+          headers = {
+              'Authorization': f'Bearer {token}',
+              'Content-Type': 'application/json'
+          }
+
+          # Find and deploy dashboard files
+          dashboard_files = glob.glob('./dashboards/*.lvdash.json')
+          
+          for dashboard_file in dashboard_files:
+              print(f"Deploying dashboard: {dashboard_file}")
+              
+              # Read dashboard definition
+              with open(dashboard_file, 'r') as f:
+                  dashboard_data = json.load(f)
+              
+              # API endpoint for creating/updating dashboards
+              # Note: You'll need to adapt this based on your dashboard structure
+              api_url = f"{host}/api/2.0/preview/sql/dashboards"
+              
+              try:
+                  response = requests.post(api_url, headers=headers, json=dashboard_data)
+                  if response.status_code == 200:
+                      print(f"✅ Dashboard deployed successfully: {dashboard_file}")
+                  else:
+                      print(f"❌ Failed to deploy dashboard {dashboard_file}: {response.text}")
+              except Exception as e:
+                  print(f"❌ Error deploying dashboard {dashboard_file}: {str(e)}")
+          EOF
