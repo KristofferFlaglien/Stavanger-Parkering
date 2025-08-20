@@ -28,3 +28,4 @@ jobs:
             filename=$(basename "$file" .ipynb)
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
+
