@@ -8,18 +8,26 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
 
     steps:
       - uses: actions/checkout@v3
 
-      - run: pip install databricks-cli
+      - run: pip install --upgrade databricks-cli
+
+      # Configure Databricks CLI
+      - run: |
+          mkdir -p ~/.databrickscfg
+          cat > ~/.databrickscfg << EOF
+          [DEFAULT]
+          host = ${{ secrets.DATABRICKS_HOST }}
+          token = ${{ secrets.DATABRICKS_TOKEN }}
+          EOF
 
       - run: |
-          export DATABRICKS_HOST=${{ secrets.DATABRICKS_HOST }}
-          export DATABRICKS_TOKEN=${{ secrets.DATABRICKS_TOKEN }}
           for file in ./notebooks/*.ipynb; do
             filename=$(basename "$file" .ipynb)
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
-
-      - run: databricks jobs run-now --job-id 1067231731387433
