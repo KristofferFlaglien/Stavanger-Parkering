@@ -1,0 +1,357 @@
+{
+  "datasets": [
+    {
+      "name": "a53330f8",
+      "displayName": "fakt_parkering",
+      "queryLines": [
+        "SELECT * FROM hive_metastore.default.fakt_parkering"
+      ]
+    },
+    {
+      "name": "15890669",
+      "displayName": "fakt_parkering_siste9",
+      "queryLines": [
+        "SELECT * FROM hive_metastore.default.fakt_parkering_siste9"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "3f64c94a",
+      "displayName": "Antall ledige spes. dato",
+      "layout": [
+        {
+          "widget": {
+            "name": "3c115303",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a53330f8",
+                  "fields": [
+                    {
+                      "name": "Sted",
+                      "expression": "`Sted`"
+                    },
+                    {
+                      "name": "klokkeslett",
+                      "expression": "`klokkeslett`"
+                    },
+                    {
+                      "name": "Antall_ledige_plasser",
+                      "expression": "`Antall_ledige_plasser`"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`dato` IN (DATE'2025-08-15T00:00:00.000', DATE'2025-08-13T00:00:00.000')"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "klokkeslett",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "labelAngle": 0
+                  },
+                  "displayName": "klokkeslett"
+                },
+                "y": {
+                  "fieldName": "Antall_ledige_plasser",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Antall_ledige_plasser"
+                },
+                "color": {
+                  "fieldName": "Sted",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Sted"
+                },
+                "label": {
+                  "show": false
+                }
+              },
+              "frame": {
+                "title": "Parking Availability Over Time",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 0,
+            "width": 5,
+            "height": 12
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "186c7e35",
+      "displayName": "Avg antall ledige",
+      "layout": [
+        {
+          "widget": {
+            "name": "f34befcd",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a53330f8",
+                  "fields": [
+                    {
+                      "name": "Sted",
+                      "expression": "`Sted`"
+                    },
+                    {
+                      "name": "klokkeslett",
+                      "expression": "`klokkeslett`"
+                    },
+                    {
+                      "name": "median(Antall_ledige_plasser)",
+                      "expression": "MEDIAN(`Antall_ledige_plasser`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`dato` IN (`dato`) OR TRUE"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "klokkeslett",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "labelAngle": 0
+                  },
+                  "displayName": "klokkeslett"
+                },
+                "y": {
+                  "fieldName": "median(Antall_ledige_plasser)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Median of Antall_ledige_plasser"
+                },
+                "color": {
+                  "fieldName": "Sted",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Sted"
+                },
+                "label": {
+                  "show": false
+                }
+              },
+              "frame": {
+                "title": "Parking Availability Over Time",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 12
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "4e454288",
+      "displayName": "Lavest antall ledige per dag",
+      "layout": [
+        {
+          "widget": {
+            "name": "3de7a462",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a53330f8",
+                  "fields": [
+                    {
+                      "name": "Sted",
+                      "expression": "`Sted`"
+                    },
+                    {
+                      "name": "daily(dato)",
+                      "expression": "DATE_TRUNC(\"DAY\", `dato`)"
+                    },
+                    {
+                      "name": "min(Antall_ledige_plasser)",
+                      "expression": "MIN(`Antall_ledige_plasser`)"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "expression": "`dato` IN (`dato`) OR TRUE"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(dato)",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "labelAngle": 0
+                  },
+                  "displayName": "dato"
+                },
+                "y": {
+                  "fieldName": "min(Antall_ledige_plasser)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Minimum Antall_ledige_plasser"
+                },
+                "color": {
+                  "fieldName": "Sted",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Sted"
+                },
+                "label": {
+                  "show": false
+                }
+              },
+              "frame": {
+                "title": "Parking Availability Over Time",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 5,
+            "height": 12
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "671b196b",
+      "displayName": "Bar plot",
+      "layout": [
+        {
+          "widget": {
+            "name": "1d5d7a8a",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "15890669",
+                  "fields": [
+                    {
+                      "name": "Sted",
+                      "expression": "`Sted`"
+                    },
+                    {
+                      "name": "Antall_ledige_plasser",
+                      "expression": "`Antall_ledige_plasser`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "Sted",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Sted"
+                },
+                "y": {
+                  "fieldName": "Antall_ledige_plasser",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Antall_ledige_plasser"
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 0,
+            "width": 5,
+            "height": 12
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    },
+    {
+      "name": "ebfe99b8",
+      "displayName": "Global Filters",
+      "layout": [
+        {
+          "widget": {
+            "name": "87b83aa6",
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {},
+              "frame": {
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 1,
+            "height": 2
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    }
+  }
+}
