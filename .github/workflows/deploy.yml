@@ -3,7 +3,7 @@ name: Deploy to Databricks Prod
 on:
   push:
     branches:
-      - main
+      - main # push to main
 
 jobs:
   deploy:
@@ -20,6 +20,14 @@ jobs:
       - name: Install Databricks CLI
         run: pip install --upgrade databricks-cli
 
+      - name: Configure Databricks CLI
+        run: |
+          cat > ~/.databrickscfg << EOF
+          [DEFAULT]
+          host = ${{ secrets.DATABRICKS_HOST }}
+          token = ${{ secrets.DATABRICKS_TOKEN }}
+          EOF
+
       - name: Deploy notebooks to Databricks
         run: |
           set -euo pipefail
@@ -28,6 +36,48 @@ jobs:
             filename=$(basename "$file" .ipynb)
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
+
+      - name: Deploy Lakeview dashboards (API method)
+        run: |
+          python3 - << 'EOF'
+          import requests
+          import json
+          import os
+          import glob
+
+          # Databricks connection details
+          host = os.environ['DATABRICKS_HOST']
+          token = os.environ['DATABRICKS_TOKEN']
+          headers = {
+              'Authorization': f'Bearer {token}',
+              'Content-Type': 'application/json'
+          }
+
+          # Find and deploy dashboard files
+          dashboard_files = glob.glob('./dashboards/*.lvdash.json')
+
+          for dashboard_file in dashboard_files:
+              print(f"Deploying dashboard: {dashboard_file}")
+
+              # Read dashboard definition
+              with open(dashboard_file, 'r') as f:
+                  dashboard_data = json.load(f)
+              
+              # Ensure the dashboard has a name
+              dashboard_data["name"] = os.path.splitext(os.path.basename(dashboard_file))[0]
+
+              # API endpoint for dashboards
+              api_url = f"{host}/api/2.0/preview/sql/dashboards"
+              
+              try:
+                  response = requests.post(api_url, headers=headers, json=dashboard_data)
+                  if response.status_code == 200:
+                      print(f"✅ Dashboard deployed successfully: {dashboard_file}")
+                  else:
+                      print(f"❌ Failed to deploy dashboard {dashboard_file}: {response.text}")
+              except Exception as e:
+                  print(f"❌ Error deploying dashboard {dashboard_file}: {str(e)}")
+          EOF
 
       - name: Create Git tag for release
         run: |
@@ -43,46 +93,4 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
-
-      - name: Deploy Lakeview dashboards (API method)
-        run: |
-python - << 'EOF'
-import requests
-import json
-import os
-import glob
-
-# Databricks connection details
-host = os.environ['DATABRICKS_HOST']
-token = os.environ['DATABRICKS_TOKEN']
-headers = {
-    'Authorization': f'Bearer {token}',
-    'Content-Type': 'application/json'
-}
-
-# Find and deploy dashboard files
-dashboard_files = glob.glob('./dashboards/*.lvdash.json')
-
-for dashboard_file in dashboard_files:
-    print(f"Deploying dashboard: {dashboard_file}")
-
-    # Read dashboard definition
-    with open(dashboard_file, 'r') as f:
-        dashboard_data = json.load(f)
-    
-    # Ensure the dashboard has a name
-    dashboard_data["name"] = os.path.splitext(os.path.basename(dashboard_file))[0]
-
-    # API endpoint for dashboards
-    api_url = f"{host}/api/2.0/preview/sql/dashboards"
-    
-    try:
-        response = requests.post(api_url, headers=headers, json=dashboard_data)
-        if response.status_code == 200:
-            print(f"✅ Dashboard deployed successfully: {dashboard_file}")
-        else:
-            print(f"❌ Failed to deploy dashboard {dashboard_file}: {response.text}")
-    except Exception as e:
-        print(f"❌ Error deploying dashboard {dashboard_file}: {str(e)}")
-EOF
 
