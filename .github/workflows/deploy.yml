@@ -10,6 +10,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # grants the workflow permission to push tags
     env:
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
@@ -69,6 +71,20 @@ jobs:
               # Read dashboard definition
               with open(dashboard_file, 'r') as f:
                   dashboard_data = json.load(f)
+              
+              # API endpoint for creating/updating dashboards
+              # Note: You'll need to adapt this based on your dashboard structure
+              api_url = f"{host}/api/2.0/preview/sql/dashboards"
+              
+              try:
+                  response = requests.post(api_url, headers=headers, json=dashboard_data)
+                  if response.status_code == 200:
+                      print(f"✅ Dashboard deployed successfully: {dashboard_file}")
+                  else:
+                      print(f"❌ Failed to deploy dashboard {dashboard_file}: {response.text}")
+              except Exception as e:
+                  print(f"❌ Error deploying dashboard {dashboard_file}: {str(e)}")
+          EOF
               
               # API endpoint for creating/updating dashboards
               # Note: You'll need to adapt this based on your dashboard structure
