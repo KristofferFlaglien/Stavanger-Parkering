@@ -85,3 +85,4 @@ for dashboard_file in dashboard_files:
     except Exception as e:
         print(f"❌ Error deploying dashboard {dashboard_file}: {str(e)}")
 EOF
+
