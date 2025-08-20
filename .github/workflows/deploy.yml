@@ -19,7 +19,6 @@ jobs:
 
       # Configure Databricks CLI
       - run: |
-          mkdir -p ~/.databrickscfg
           cat > ~/.databrickscfg << EOF
           [DEFAULT]
           host = ${{ secrets.DATABRICKS_HOST }}
