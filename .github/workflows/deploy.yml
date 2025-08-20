@@ -1,75 +1,97 @@
+# This workflow triggers when code is pushed to the main branch
 name: Deploy to Databricks Prod
 
 on:
   push:
     branches:
-      - main # push to main
+      - main  # Only run when pushing to main branch (production deployments)
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Use GitHub's Ubuntu virtual machine
     permissions:
-      contents: write
+      contents: write  # Allow this workflow to write to the repository (needed for git tags)
     env:
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
-      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      # Load secrets from GitHub repository settings
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}      # Your Databricks workspace URL
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}    # Your personal access token
 
     steps:
+      # STEP 1: Get the code from your repository
       - uses: actions/checkout@v3
+        # This downloads your repository's code to the GitHub runner
 
+      # STEP 2: Install the Databricks command-line tool
       - name: Install Databricks CLI
         run: pip install --upgrade databricks-cli
+        # This installs the databricks CLI so we can interact with Databricks
 
+      # STEP 3: Configure the Databricks CLI with your credentials
       - name: Configure Databricks CLI
         run: |
+          # Create a configuration file that tells the CLI which workspace to use
           cat > ~/.databrickscfg << EOF
           [DEFAULT]
-          host = ${{ secrets.DATABRICKS_HOST }}
-          token = ${{ secrets.DATABRICKS_TOKEN }}
+          host = ${{ secrets.DATABRICKS_HOST }}    # Where to connect
+          token = ${{ secrets.DATABRICKS_TOKEN }}  # How to authenticate
           EOF
+        # Without this step, the CLI wouldn't know which Databricks workspace to use
 
+      # STEP 4: Deploy your Jupyter notebooks to Databricks
       - name: Deploy notebooks to Databricks
         run: |
-          set -euo pipefail
+          set -euo pipefail  # Exit immediately if any command fails
+          # Loop through all .ipynb files in the notebooks folder
           for file in ./notebooks/*.ipynb; do
-            echo "Deploying $file"
-            filename=$(basename "$file" .ipynb)
+            echo "Deploying $file"  # Show which file we're deploying
+            filename=$(basename "$file" .ipynb)  # Get filename without .ipynb extension
+            # Upload the notebook to Databricks workspace
+            # "/Shared/${filename}_prod" = destination path in Databricks
+            # -f SOURCE = format as source code
+            # -l PYTHON = language is Python  
+            # --overwrite = replace if it already exists
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
 
+      # STEP 5: Deploy dashboards (if you have any .lvdash.json files)
       - name: Deploy Lakeview dashboards (API method)
         run: |
+          # Run a Python script inline to handle dashboard deployment
           python3 - << 'EOF'
-          import requests
-          import json
-          import os
-          import glob
+          import requests  # For making HTTP API calls
+          import json      # For parsing JSON files
+          import os        # For environment variables
+          import glob      # For finding files with patterns
 
-          # Databricks connection details
+          # Get Databricks connection info from environment variables
           host = os.environ['DATABRICKS_HOST']
           token = os.environ['DATABRICKS_TOKEN']
+          
+          # Set up HTTP headers for API authentication
           headers = {
-              'Authorization': f'Bearer {token}',
-              'Content-Type': 'application/json'
+              'Authorization': f'Bearer {token}',    # Authenticate with your token
+              'Content-Type': 'application/json'    # Tell API we're sending JSON
           }
 
-          # Find and deploy dashboard files
+          # Find all dashboard files in the dashboards folder
           dashboard_files = glob.glob('./dashboards/*.lvdash.json')
 
+          # Deploy each dashboard file
           for dashboard_file in dashboard_files:
               print(f"Deploying dashboard: {dashboard_file}")
 
-              # Read dashboard definition
+              # Read the dashboard definition from the JSON file
               with open(dashboard_file, 'r') as f:
                   dashboard_data = json.load(f)
               
-              # Ensure the dashboard has a name
+              # Make sure the dashboard has a name (use filename if not specified)
               dashboard_data["name"] = os.path.splitext(os.path.basename(dashboard_file))[0]
 
-              # API endpoint for dashboards
+              # Databricks API endpoint for creating dashboards
               api_url = f"{host}/api/2.0/preview/sql/dashboards"
               
               try:
+                  # Send the dashboard to Databricks via HTTP POST
                   response = requests.post(api_url, headers=headers, json=dashboard_data)
                   if response.status_code == 200:
                       print(f"✅ Dashboard deployed successfully: {dashboard_file}")
@@ -79,18 +101,26 @@ jobs:
                   print(f"❌ Error deploying dashboard {dashboard_file}: {str(e)}")
           EOF
 
+      # STEP 6: Create a git tag to mark this deployment
       - name: Create Git tag for release
         run: |
+          # Configure git with a user (required to make commits/tags)
+          # These are the "official" GitHub Actions bot credentials
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions[bot]"
+          
+          # Create a tag with current timestamp to mark this deployment
           git tag "prod-deploy-$(date +'%Y-%m-%d-%H-%M')" -m "Deployed to production"
+          
+          # Push the tag back to GitHub so you can see deployment history
           git push origin --tags
 
+      # STEP 7: Success notification
       - name: Notify on success
-        if: success()
+        if: success()  # Only run if all previous steps succeeded
         run: echo "✅ Deployment to production successful!"
 
+      # STEP 8: Failure notification  
       - name: Notify on failure
-        if: failure()
+        if: failure()  # Only run if any previous step failed
         run: echo "❌ Deployment to production failed!"
-
