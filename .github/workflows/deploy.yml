@@ -3,7 +3,7 @@ name: Deploy to Databricks Prod
 on:
   push:
     branches:
-      - main
+      - main # push to main
 
 jobs:
   deploy:
