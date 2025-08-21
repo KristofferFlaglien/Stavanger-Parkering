@@ -53,53 +53,15 @@ jobs:
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
 
-      # STEP 5: Deploy dashboards (if you have any .lvdash.json files)
-      - name: Deploy Lakeview dashboards (API method)
+      # STEP 5: Deploy dashboards (NEW and CORRECT METHOD)
+      - name: Deploy Lakeview dashboards
         run: |
-          # Run a Python script inline to handle dashboard deployment
-          python3 - << 'EOF'
-          import requests  # For making HTTP API calls
-          import json      # For parsing JSON files
-          import os        # For environment variables
-          import glob      # For finding files with patterns
-
-          # Get Databricks connection info from environment variables
-          host = os.environ['DATABRICKS_HOST']
-          token = os.environ['DATABRICKS_TOKEN']
-          
-          # Set up HTTP headers for API authentication
-          headers = {
-              'Authorization': f'Bearer {token}',    # Authenticate with your token
-              'Content-Type': 'application/json'    # Tell API we're sending JSON
-          }
-
-          # Find all dashboard files in the dashboards folder
-          dashboard_files = glob.glob('./dashboards/*.lvdash.json')
-
-          # Deploy each dashboard file
-          for dashboard_file in dashboard_files:
-              print(f"Deploying dashboard: {dashboard_file}")
-
-              # Read the dashboard definition from the JSON file
-              with open(dashboard_file, 'r') as f:
-                  dashboard_data = json.load(f)
-              
-              # Make sure the dashboard has a name (use filename if not specified)
-              dashboard_data["name"] = os.path.splitext(os.path.basename(dashboard_file))[0]
-
-              # Databricks API endpoint for creating dashboards
-              api_url = f"{host}/api/2.0/lakeview/dashboards"
-              
-              try:
-                  # Send the dashboard to Databricks via HTTP POST
-                  response = requests.post(api_url, headers=headers, json=dashboard_data)
-                  if response.status_code == 200:
-                      print(f"✅ Dashboard deployed successfully: {dashboard_file}")
-                  else:
-                      print(f"❌ Failed to deploy dashboard {dashboard_file}: {response.text}")
-              except Exception as e:
-                  print(f"❌ Error deploying dashboard {dashboard_file}: {str(e)}")
-          EOF
+          set -euo pipefail
+          # Loop through all dashboard files and deploy them using the Databricks CLI
+          for file in ./dashboards/*.lvdash.json; do
+            echo "Deploying dashboard $file"
+            databricks workspace import "$file" "/Shared/$(basename "$file")" --overwrite
+          done
 
       # STEP 6: Create a git tag to mark this deployment
       - name: Create Git tag for release
