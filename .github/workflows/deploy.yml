@@ -88,7 +88,7 @@ jobs:
               dashboard_data["name"] = os.path.splitext(os.path.basename(dashboard_file))[0]
 
               # Databricks API endpoint for creating dashboards
-              api_url = f"{host}/api/2.0/preview/sql/dashboards"
+              api_url = f"{host}/api/2.0/lakeview/dashboards"
               
               try:
                   # Send the dashboard to Databricks via HTTP POST
