@@ -6,6 +6,7 @@ Deploys Databricks notebooks and Lakeview dashboards in an idempotent way:
 - Dashboards: updates existing dashboards or creates new ones if they don't exist.
 """
 
+import logging
 import os
 import glob
 import json
