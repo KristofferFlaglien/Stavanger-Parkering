@@ -28,6 +28,7 @@ jobs:
           host = ${{ secrets.DATABRICKS_HOST }}
           token = ${{ secrets.DATABRICKS_TOKEN }}
           EOF
+
       - name: Deploy notebooks to Databricks
         run: |
           set -euo pipefail
@@ -36,7 +37,6 @@ jobs:
             filename=$(basename "$file" .ipynb)
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
-
       - name: Deploy Lakeview dashboards (Lakeview API)
         run: |
           python3 - << 'EOF'
@@ -60,7 +60,9 @@ jobs:
               with open(dashboard_file, 'r') as f:
                   dashboard_data = json.load(f)
 
-              dashboard_data.setdefault("display_name", os.path.splitext(os.path.basename(dashboard_file))[0])
+              # Strip both .json and .lvdash extensions
+              clean_name = os.path.splitext(os.path.splitext(os.path.basename(dashboard_file))[0])[0]
+              dashboard_data["display_name"] = clean_name
 
               api_url = f"{host}/api/2.0/lakeview/dashboards"
 
