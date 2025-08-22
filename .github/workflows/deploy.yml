@@ -37,9 +37,9 @@ jobs:
           token = ${{ secrets.DATABRICKS_TOKEN }}
           EOF
 
-      # Step 4: Deploy notebooks and dashboards using Python script
+      # Step 4: Deploy notebooks, jobs and dashboards using Python script
       # This replaces embedded scripts and centralizes all deployment logic
-      - name: Deploy notebooks and Lakeview dashboards
+      - name: Deploy notebooks, jobs and Lakeview dashboards
         run: python3 scripts/deploy_to_databricks.py
 
       # Step 5: Tag the deployment in GitHub for traceability
