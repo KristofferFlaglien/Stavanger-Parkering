@@ -221,4 +221,3 @@ if __name__ == "__main__":
     deploy_notebooks()    # Deploy notebooks first
     deploy_dashboards()   # Then deploy dashboards
     deploy_jobs()         # Finally, deploy jobs
-
