@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Install Databricks CLI
-        run: pip install --upgrade databricks-cli
+        run: pip install --upgrade databricks-cli requests
 
       - name: Configure Databricks CLI
         run: |
@@ -38,7 +38,7 @@ jobs:
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
 
-      - name: Deploy Lakeview dashboards (clean workspace first)
+      - name: Deploy Lakeview dashboards (idempotent update or create)
         run: |
           python3 - << 'EOF'
           import requests
@@ -57,36 +57,47 @@ jobs:
           dashboard_files = glob.glob('./dashboards/*.lvdash.json')
 
           for dashboard_file in dashboard_files:
-              print(f"Deploying Lakeview dashboard: {dashboard_file}")
+              print(f"Processing Lakeview dashboard: {dashboard_file}")
               with open(dashboard_file, 'r') as f:
                   dashboard_data = json.load(f)
 
-              # Strip both .json and .lvdash extensions
+              # Clean name from file
               clean_name = os.path.splitext(os.path.splitext(os.path.basename(dashboard_file))[0])[0]
               dashboard_data["display_name"] = clean_name
               dashboard_data["parent_path"] = "/Shared"
 
-              # Workspace path for the dashboard file
-              workspace_path = f"/Shared/{clean_name}.lvdash.json"
+              # Step 1: Check if dashboard already exists
+              list_url = f"{host}/api/2.0/lakeview/dashboards"
+              params = {"q": clean_name}
+              list_resp = requests.get(list_url, headers=headers, params=params)
 
-              # Step 1: Delete existing dashboard file from workspace
-              delete_url = f"{host}/api/2.0/workspace/delete"
-              delete_payload = {"path": workspace_path}
-              del_response = requests.post(delete_url, headers=headers, json=delete_payload)
-              if del_response.status_code == 200:
-                  print(f"🗑️ Deleted existing dashboard file at: {workspace_path}")
-              elif del_response.status_code == 404:
-                  print(f"ℹ️ No existing dashboard file to delete at: {workspace_path}")
-              else:
-                  print(f"⚠️ Failed to delete dashboard file: {del_response.text}")
+              if list_resp.status_code != 200:
+                  print(f"⚠️ Failed to list dashboards: {list_resp.text}")
+                  continue
 
-              # Step 2: Create new dashboard
-              create_url = f"{host}/api/2.0/lakeview/dashboards"
-              response = requests.post(create_url, headers=headers, json=dashboard_data)
-              if response.status_code in [200, 201]:
-                  print(f"✅ Dashboard deployed successfully: {dashboard_file}")
+              existing = None
+              for dash in list_resp.json().get("dashboards", []):
+                  if dash.get("display_name") == clean_name:
+                      existing = dash
+                      break
+
+              if existing:
+                  # Step 2: Update existing dashboard
+                  dash_id = existing["id"]
+                  update_url = f"{host}/api/2.0/lakeview/dashboards/{dash_id}"
+                  update_resp = requests.patch(update_url, headers=headers, json=dashboard_data)
+                  if update_resp.status_code == 200:
+                      print(f"✅ Updated existing dashboard: {clean_name}")
+                  else:
+                      print(f"❌ Failed to update dashboard {clean_name}: {update_resp.text}")
               else:
-                  print(f"❌ Failed to deploy dashboard {dashboard_file}: {response.text}")
+                  # Step 3: Create new dashboard
+                  create_url = f"{host}/api/2.0/lakeview/dashboards"
+                  create_resp = requests.post(create_url, headers=headers, json=dashboard_data)
+                  if create_resp.status_code in [200, 201]:
+                      print(f"✅ Created new dashboard: {clean_name}")
+                  else:
+                      print(f"❌ Failed to create dashboard {clean_name}: {create_resp.text}")
           EOF
 
       - name: Create Git tag for release
