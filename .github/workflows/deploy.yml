@@ -8,23 +8,19 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest  # Use GitHub's Ubuntu virtual machine
+    runs-on: ubuntu-latest
     permissions:
-      contents: write  # Allow this workflow to write to the repository (needed for git tags)
+      contents: write
     env:
-      # Load secrets from GitHub repository settings
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}    # Your Databricks workspace URL
-      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}  # Your personal access token
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
 
     steps:
-      # STEP 1: Get the code from your repository
       - uses: actions/checkout@v3
 
-      # STEP 2: Install the Databricks command-line tool
       - name: Install Databricks CLI
-        run: pip install --upgrade databricks-cli databricks-sdk
+        run: pip install --upgrade databricks-cli
 
-      # STEP 3: Configure the Databricks CLI with your credentials
       - name: Configure Databricks CLI
         run: |
           cat > ~/.databrickscfg << EOF
@@ -33,13 +29,52 @@ jobs:
           token = ${{ secrets.DATABRICKS_TOKEN }}
           EOF
 
-      # STEP 4: Deploy your Databricks bundle
-      - name: Deploy Databricks bundle
+      - name: Deploy notebooks to Databricks
         run: |
-          # The `bundle deploy` command is now the unified way to deploy all assets
-          databricks bundle deploy --target prod
+          set -euo pipefail
+          for file in ./notebooks/*.ipynb; do
+            echo "Deploying $file"
+            filename=$(basename "$file" .ipynb)
+            databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
+          done
 
-      # STEP 5: Create a git tag to mark this deployment
+      - name: Deploy Lakeview dashboards (Lakeview API)
+        run: |
+          python3 - << 'EOF'
+          import requests
+          import json
+          import os
+          import glob
+
+          host = os.environ['DATABRICKS_HOST']
+          token = os.environ['DATABRICKS_TOKEN']
+
+          headers = {
+              'Authorization': f'Bearer {token}',
+              'Content-Type': 'application/json'
+          }
+
+          dashboard_files = glob.glob('./dashboards/*.lvdash.json')
+
+          for dashboard_file in dashboard_files:
+              print(f"Deploying Lakeview dashboard: {dashboard_file}")
+              with open(dashboard_file, 'r') as f:
+                  dashboard_data = json.load(f)
+
+              dashboard_data.setdefault("name", os.path.splitext(os.path.basename(dashboard_file))[0])
+
+              api_url = f"{host}/api/2.0/sql/dashboards"
+
+              try:
+                  response = requests.post(api_url, headers=headers, json=dashboard_data)
+                  if response.status_code in [200, 201]:
+                      print(f"✅ Dashboard deployed successfully: {dashboard_file}")
+                  else:
+                      print(f"❌ Failed to deploy dashboard {dashboard_file}: {response.text}")
+              except Exception as e:
+                  print(f"❌ Error deploying dashboard {dashboard_file}: {str(e)}")
+          EOF
+
       - name: Create Git tag for release
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -47,12 +82,11 @@ jobs:
           git tag "prod-deploy-$(date +'%Y-%m-%d-%H-%M')" -m "Deployed to production"
           git push origin --tags
 
-      # STEP 6: Success notification
       - name: Notify on success
         if: success()
         run: echo "✅ Deployment to production successful!"
 
-      # STEP 7: Failure notification
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
+
