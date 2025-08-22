@@ -4,23 +4,27 @@ name: Deploy to Databricks Prod
 on:
   push:
     branches:
-      - main
+      - main  # Only deploy when main branch is updated
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # Use Ubuntu VM to run the workflow
     permissions:
-      contents: write
+      contents: write  # Required to push tags back to repo
     env:
+      # Secrets stored in GitHub are passed as environment variables
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
 
     steps:
+      # Step 1: Checkout the repo code
       - uses: actions/checkout@v3
 
+      # Step 2: Install dependencies: Databricks CLI and requests library
       - name: Install Databricks CLI
         run: pip install --upgrade databricks-cli requests
 
+      # Step 3: Configure Databricks CLI with host and token
       - name: Configure Databricks CLI
         run: |
           cat > ~/.databrickscfg << EOF
@@ -29,15 +33,20 @@ jobs:
           token = ${{ secrets.DATABRICKS_TOKEN }}
           EOF
 
+      # Step 4: Deploy notebooks to Databricks workspace
       - name: Deploy notebooks to Databricks
         run: |
-          set -euo pipefail
-          for file in ./notebooks/*.ipynb; do
+          set -euo pipefail  # Exit if any command fails
+          for file in ./notebooks/*.ipynb; do  # Loop through all notebook files
             echo "Deploying $file"
-            filename=$(basename "$file" .ipynb)
+            filename=$(basename "$file" .ipynb)  # Strip directory and extension
+            # Import notebook to Databricks /Shared folder with _prod suffix
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
 
+      # Step 5: Deploy Lakeview dashboards in an idempotent way
+      # - If a dashboard already exists with the same name, it updates it
+      # - If it doesn’t exist, it creates a new one
       - name: Deploy Lakeview dashboards (idempotent update or create)
         run: |
           python3 - << 'EOF'
@@ -46,33 +55,40 @@ jobs:
           import os
           import glob
 
+          # Read Databricks host and token from environment variables
           host = os.environ['DATABRICKS_HOST']
           token = os.environ['DATABRICKS_TOKEN']
 
+          # Headers for REST API requests
           headers = {
               'Authorization': f'Bearer {token}',
               'Content-Type': 'application/json'
           }
 
+          # Find all dashboard JSON files in ./dashboards folder
           dashboard_files = glob.glob('./dashboards/*.lvdash.json')
 
           for dashboard_file in dashboard_files:
               print(f"Processing Lakeview dashboard: {dashboard_file}")
+              
+              # Load dashboard JSON data
               with open(dashboard_file, 'r') as f:
                   dashboard_data = json.load(f)
 
+              # Extract clean dashboard name from filename
               clean_name = os.path.splitext(os.path.splitext(os.path.basename(dashboard_file))[0])[0]
-              dashboard_data["display_name"] = clean_name
-              dashboard_data["parent_path"] = "/Shared"
+              dashboard_data["display_name"] = clean_name  # Set display name in payload
+              dashboard_data["parent_path"] = "/Shared"    # Set parent folder
 
-              # Step 1: List dashboards
+              # Step 1: List all dashboards in Databricks
               list_url = f"{host}/api/2.0/lakeview/dashboards"
               list_resp = requests.get(list_url, headers=headers)
 
               if list_resp.status_code != 200:
                   print(f"⚠️ Failed to list dashboards: {list_resp.text}")
-                  continue
+                  continue  # Skip this dashboard if listing fails
 
+              # Step 2: Check if a dashboard with the same name exists
               existing = None
               dashboards = list_resp.json().get("dashboards", [])
               for dash in dashboards:
@@ -81,12 +97,13 @@ jobs:
                       break
 
               if existing:
-                  # Use dashboard_id field (confirmed by API response)
+                  # If dashboard exists, get its unique identifier for updating
                   dash_identifier = existing.get("dashboard_id")
                   if not dash_identifier:
                       print(f"⚠️ Found dashboard named {clean_name}, but no usable identifier in response: {existing}")
                       continue
 
+                  # Step 3: Update the existing dashboard
                   update_url = f"{host}/api/2.0/lakeview/dashboards/{dash_identifier}"
                   update_resp = requests.patch(update_url, headers=headers, json=dashboard_data)
 
@@ -95,7 +112,7 @@ jobs:
                   else:
                       print(f"❌ Failed to update dashboard {clean_name}: {update_resp.status_code} {update_resp.text}")
               else:
-                  # Create new dashboard
+                  # Step 4: Create a new dashboard if it doesn’t exist
                   create_url = f"{host}/api/2.0/lakeview/dashboards"
                   create_resp = requests.post(create_url, headers=headers, json=dashboard_data)
 
@@ -105,6 +122,7 @@ jobs:
                       print(f"❌ Failed to create dashboard {clean_name}: {create_resp.status_code} {create_resp.text}")
           EOF
 
+      # Step 6: Create a git tag for this release
       - name: Create Git tag for release
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -112,10 +130,12 @@ jobs:
           git tag "prod-deploy-$(date +'%Y-%m-%d-%H-%M')" -m "Deployed to production"
           git push origin --tags
 
+      # Step 7: Notify on success
       - name: Notify on success
         if: success()
         run: echo "✅ Deployment to production successful!"
 
+      # Step 8: Notify on failure
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
