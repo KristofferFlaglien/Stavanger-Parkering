@@ -28,7 +28,6 @@ jobs:
           host = ${{ secrets.DATABRICKS_HOST }}
           token = ${{ secrets.DATABRICKS_TOKEN }}
           EOF
-
       - name: Deploy notebooks to Databricks
         run: |
           set -euo pipefail
@@ -37,7 +36,8 @@ jobs:
             filename=$(basename "$file" .ipynb)
             databricks workspace import "$file" "/Shared/${filename}_prod" -f SOURCE -l PYTHON --overwrite
           done
-      - name: Deploy Lakeview dashboards (Lakeview API)
+
+      - name: Deploy Lakeview dashboards (overwrite if exists)
         run: |
           python3 - << 'EOF'
           import requests
@@ -64,16 +64,33 @@ jobs:
               clean_name = os.path.splitext(os.path.splitext(os.path.basename(dashboard_file))[0])[0]
               dashboard_data["display_name"] = clean_name
 
-              api_url = f"{host}/api/2.0/lakeview/dashboards"
+              # Step 1: Search for existing dashboards
+              search_url = f"{host}/api/2.0/lakeview/dashboards"
+              existing_dashboards = requests.get(search_url, headers=headers).json()
 
-              try:
-                  response = requests.post(api_url, headers=headers, json=dashboard_data)
-                  if response.status_code in [200, 201]:
-                      print(f"✅ Dashboard deployed successfully: {dashboard_file}")
+              # Step 2: Check if dashboard with same name exists
+              existing_id = None
+              for dash in existing_dashboards.get("dashboards", []):
+                  if dash.get("display_name") == clean_name:
+                      existing_id = dash.get("id")
+                      break
+
+              # Step 3: Delete if exists
+              if existing_id:
+                  delete_url = f"{host}/api/2.0/lakeview/dashboards/{existing_id}"
+                  del_response = requests.delete(delete_url, headers=headers)
+                  if del_response.status_code == 200:
+                      print(f"🗑️ Deleted existing dashboard: {clean_name}")
                   else:
-                      print(f"❌ Failed to deploy dashboard {dashboard_file}: {response.text}")
-              except Exception as e:
-                  print(f"❌ Error deploying dashboard {dashboard_file}: {str(e)}")
+                      print(f"⚠️ Failed to delete existing dashboard: {del_response.text}")
+
+              # Step 4: Create new dashboard
+              create_url = f"{host}/api/2.0/lakeview/dashboards"
+              response = requests.post(create_url, headers=headers, json=dashboard_data)
+              if response.status_code in [200, 201]:
+                  print(f"✅ Dashboard deployed successfully: {dashboard_file}")
+              else:
+                  print(f"❌ Failed to deploy dashboard {dashboard_file}: {response.text}")
           EOF
 
       - name: Create Git tag for release
@@ -90,4 +107,5 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
+
 
