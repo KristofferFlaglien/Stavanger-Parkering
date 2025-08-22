@@ -129,95 +129,9 @@ def deploy_dashboards(dashboards_dir="dashboards"):
             except requests.RequestException as e:
                 print(f"❌ Exception during creation {clean_name}: {e}")
 
-
-# -------------------------------
-# Function: Deploy Jobs
-# -------------------------------              
-
-def deploy_jobs():
-    """
-    Deploys Databricks Jobs defined in JSON files (stored in ./jobs/ directory)
-    into the Databricks workspace using the Jobs REST API.
-
-    This function does three things:
-      1. Reads each job definition from your repo (Git is the source of truth).
-      2. Checks if a job with the same name already exists in Databricks.
-      3. Either updates the existing job OR creates a new one if none exists.
-
-    That way, your production Databricks jobs always match what’s defined in Git.
-    """
-
-    jobs_dir = Path("./jobs")   # Local folder in your repo where job definitions live
-    if not jobs_dir.exists():
-        print("ℹ️ No jobs directory found, skipping job deployment")
-        return
-
-    # Iterate over all JSON files in ./jobs (each one is a job definition)
-    for job_file in jobs_dir.glob("*.json"):
-        print(f"Processing job definition: {job_file}")
-
-        # Load the job definition from JSON file (dict structure ready for API)
-        with open(job_file, "r", encoding="utf-8") as f:
-            job_def = json.load(f)
-
-        # Extract job name (required) from the JSON definition
-        job_name = job_def.get("name")
-        if not job_name:
-            print(f"⚠️ Skipping {job_file}, missing 'name' in job definition")
-            continue
-
-        # ------------------------------------------------------------
-        # 1. Check if a job with the same name already exists in Databricks
-        # ------------------------------------------------------------
-        resp = requests.get(
-            f"{DATABRICKS_HOST}/api/2.1/jobs/list",
-            headers=HEADERS,
-        )
-        resp.raise_for_status()
-        jobs_list = resp.json().get("jobs", [])
-
-        # Try to find an existing job with this exact name
-        existing_job = next((j for j in jobs_list if j["settings"]["name"] == job_name), None)
-
-        # ------------------------------------------------------------
-        # 2. Update existing job if found
-        # ------------------------------------------------------------
-        if existing_job:
-            job_id = existing_job["job_id"]
-            print(f"🔄 Updating existing job: {job_name} (id={job_id})")
-
-            # /jobs/update requires you to pass the job_id and the new settings
-            update_payload = {
-                "job_id": job_id,
-                "new_settings": job_def  # replace settings with what’s in Git
-            }
-            resp = requests.post(
-                f"{DATABRICKS_HOST}/api/2.1/jobs/update",
-                headers=HEADERS,
-                data=json.dumps(update_payload),
-            )
-            resp.raise_for_status()
-            print(f"✅ Job updated: {job_name}")
-
-        # ------------------------------------------------------------
-        # 3. Otherwise, create a new job
-        # ------------------------------------------------------------
-        else:
-            print(f"➕ Creating new job: {job_name}")
-            resp = requests.post(
-                f"{DATABRICKS_HOST}/api/2.1/jobs/create",
-                headers=HEADERS,
-                data=json.dumps(job_def),
-            )
-            resp.raise_for_status()
-            print(f"✅ Job created: {job_name}")
-
-
-
 # -------------------------------
 # Main execution
 # -------------------------------
 if __name__ == "__main__":
     deploy_notebooks()    # Deploy notebooks first
     deploy_dashboards()   # Then deploy dashboards
-    deploy_jobs()         # Finally, deploy jobs
