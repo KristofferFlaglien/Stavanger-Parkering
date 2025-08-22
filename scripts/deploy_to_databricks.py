@@ -135,3 +135,4 @@ def deploy_dashboards(dashboards_dir="dashboards"):
 if __name__ == "__main__":
     deploy_notebooks()    # Deploy notebooks first
     deploy_dashboards()   # Then deploy dashboards
+
