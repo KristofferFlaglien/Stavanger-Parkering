@@ -61,39 +61,44 @@ jobs:
               with open(dashboard_file, 'r') as f:
                   dashboard_data = json.load(f)
 
-              # Clean name from file
               clean_name = os.path.splitext(os.path.splitext(os.path.basename(dashboard_file))[0])[0]
               dashboard_data["display_name"] = clean_name
               dashboard_data["parent_path"] = "/Shared"
 
-              # Step 1: Check if dashboard already exists
+              # Step 1: List dashboards and find existing by display_name
               list_url = f"{host}/api/2.0/lakeview/dashboards"
-              params = {"q": clean_name}
-              list_resp = requests.get(list_url, headers=headers, params=params)
+              list_resp = requests.get(list_url, headers=headers)
 
               if list_resp.status_code != 200:
                   print(f"⚠️ Failed to list dashboards: {list_resp.text}")
                   continue
 
               existing = None
-              for dash in list_resp.json().get("dashboards", []):
+              dashboards = list_resp.json().get("dashboards", [])
+              for dash in dashboards:
                   if dash.get("display_name") == clean_name:
                       existing = dash
                       break
 
               if existing:
-                  # Step 2: Update existing dashboard
-                  dash_id = existing["id"]
-                  update_url = f"{host}/api/2.0/lakeview/dashboards/{dash_id}"
+                  # Use identifier (preferred) or id
+                  dash_identifier = existing.get("identifier") or existing.get("id")
+                  if not dash_identifier:
+                      print(f"⚠️ Found dashboard named {clean_name}, but no identifier/id in response: {existing}")
+                      continue
+
+                  update_url = f"{host}/api/2.0/lakeview/dashboards/{dash_identifier}"
                   update_resp = requests.patch(update_url, headers=headers, json=dashboard_data)
+
                   if update_resp.status_code == 200:
                       print(f"✅ Updated existing dashboard: {clean_name}")
                   else:
                       print(f"❌ Failed to update dashboard {clean_name}: {update_resp.text}")
               else:
-                  # Step 3: Create new dashboard
+                  # Create new dashboard
                   create_url = f"{host}/api/2.0/lakeview/dashboards"
                   create_resp = requests.post(create_url, headers=headers, json=dashboard_data)
+
                   if create_resp.status_code in [200, 201]:
                       print(f"✅ Created new dashboard: {clean_name}")
                   else:
