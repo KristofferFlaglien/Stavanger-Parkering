@@ -1,0 +1,89 @@
+{
+  "name": "Stavanger_parkering",
+  "email_notifications": {
+    "on_failure": [
+      "kristoffer.flaglien@bouvet.no"
+    ],
+    "no_alert_for_skipped_runs": true
+  },
+  "webhook_notifications": {},
+  "timeout_seconds": 0,
+  "trigger": {
+    "pause_status": "UNPAUSED",
+    "periodic": {
+      "interval": 4,
+      "unit": "HOURS"
+    }
+  },
+  "max_concurrent_runs": 1,
+  "tasks": [
+    {
+      "task_key": "01_ingest_bronze",
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/Repos/Stavanger Parkering-git/Stavanger Parkering/notebooks/01_ingest_bronze",
+        "source": "WORKSPACE"
+      },
+      "existing_cluster_id": "0807-130351-pnw49qy0",
+      "timeout_seconds": 0,
+      "email_notifications": {},
+      "webhook_notifications": {}
+    },
+    {
+      "task_key": "02_transform_silver",
+      "depends_on": [
+        {
+          "task_key": "01_ingest_bronze"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/Repos/Stavanger Parkering-git/Stavanger Parkering/notebooks/02_transform_silver",
+        "source": "WORKSPACE"
+      },
+      "existing_cluster_id": "0807-130351-pnw49qy0",
+      "timeout_seconds": 0,
+      "email_notifications": {},
+      "webhook_notifications": {}
+    },
+    {
+      "task_key": "03_build_dims",
+      "depends_on": [
+        {
+          "task_key": "02_transform_silver"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/Repos/Stavanger Parkering-git/Stavanger Parkering/notebooks/03_build_dims",
+        "source": "WORKSPACE"
+      },
+      "existing_cluster_id": "0807-130351-pnw49qy0",
+      "timeout_seconds": 0,
+      "email_notifications": {},
+      "webhook_notifications": {}
+    },
+    {
+      "task_key": "04_create_gold",
+      "depends_on": [
+        {
+          "task_key": "02_transform_silver"
+        }
+      ],
+      "run_if": "ALL_SUCCESS",
+      "notebook_task": {
+        "notebook_path": "/Repos/Stavanger Parkering-git/Stavanger Parkering/notebooks/04_create_gold",
+        "source": "WORKSPACE"
+      },
+      "existing_cluster_id": "0807-130351-pnw49qy0",
+      "timeout_seconds": 0,
+      "email_notifications": {}
+    }
+  ],
+  "queue": {
+    "enabled": true
+  },
+  "run_as": {
+    "user_name": "kristoffer.flaglien@bouvet.no"
+  }
+}
