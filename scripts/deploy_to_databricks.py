@@ -1,9 +1,10 @@
 """
 deploy_to_databricks.py
 
-Deploys Databricks notebooks and Lakeview dashboards in an idempotent way:
+Deploys Databricks notebooks, Lakeview dashboards, and Jobs in an idempotent way:
 - Notebooks: imported to /Shared/{filename}_prod, overwriting existing ones.
 - Dashboards: updates existing dashboards or creates new ones if they don't exist.
+- Jobs: updates existing jobs or creates new ones if they don't exist.
 """
 
 from pathlib import Path
@@ -40,7 +41,6 @@ def deploy_notebooks(notebooks_dir="notebooks"):
     Deploy all notebooks from notebooks_dir to /Shared/{filename}_prod.
     Uses the Databricks CLI to import notebooks.
     """
-    # Find all .ipynb files in the specified directory
     notebook_files = glob.glob(f"{notebooks_dir}/*.ipynb")
 
     if not notebook_files:
@@ -48,13 +48,10 @@ def deploy_notebooks(notebooks_dir="notebooks"):
         return
 
     for nb in notebook_files:
-        # Extract filename without extension
         filename = os.path.basename(nb).replace(".ipynb", "")
-        # Define target path in Databricks workspace
         workspace_path = f"/Shared/{filename}_prod"
         print(f"Deploying notebook: {nb} -> {workspace_path}")
         try:
-            # Use Databricks CLI to import notebook
             subprocess.run(
                 ["databricks", "workspace", "import", nb, workspace_path, "-f", "SOURCE", "-l", "PYTHON", "--overwrite"],
                 check=True
@@ -71,7 +68,6 @@ def deploy_dashboards(dashboards_dir="dashboards"):
     Deploy all Lakeview dashboards from dashboards_dir to /Shared.
     Updates existing dashboards if found; otherwise, creates new dashboards.
     """
-    # Find all dashboard JSON files with .lvdash.json extension
     dashboard_files = glob.glob(f"{dashboards_dir}/*.lvdash.json")
 
     if not dashboard_files:
@@ -80,34 +76,28 @@ def deploy_dashboards(dashboards_dir="dashboards"):
 
     for dashboard_file in dashboard_files:
         print(f"Processing dashboard: {dashboard_file}")
-        # Load dashboard JSON content
         with open(dashboard_file, "r") as f:
             data = json.load(f)
 
-        # Extract clean name from filename (remove double extensions)
         clean_name = os.path.splitext(os.path.splitext(os.path.basename(dashboard_file))[0])[0]
-        data["display_name"] = clean_name  # Set display name
-        data["parent_path"] = "/Shared"    # Set parent folder in workspace
+        data["display_name"] = clean_name
+        data["parent_path"] = "/Shared"
 
-        # Step 1: List existing dashboards to check for duplicates
         try:
             resp = requests.get(f"{HOST}/api/2.0/lakeview/dashboards", headers=HEADERS)
             resp.raise_for_status()
         except requests.RequestException as e:
             print(f"⚠️ Failed to list dashboards: {e}")
-            continue  # Skip this dashboard if listing fails
+            continue
         dashboards = resp.json().get("dashboards", [])
-        # Try to find a dashboard with the same display name
         existing = next((d for d in dashboards if d.get("display_name") == clean_name), None)
 
-        # Step 2: Update if exists, create if not
         if existing:
             dash_id = existing.get("dashboard_id")
             if not dash_id:
                 print(f"⚠️ Found dashboard {clean_name} but no dashboard_id. Skipping.")
                 continue
 
-            # Update existing dashboard
             update_url = f"{HOST}/api/2.0/lakeview/dashboards/{dash_id}"
             try:
                 update_resp = requests.patch(update_url, headers=HEADERS, json=data)
@@ -119,7 +109,6 @@ def deploy_dashboards(dashboards_dir="dashboards"):
                 print(f"❌ Exception during update {clean_name}: {e}")
 
         else:
-            # Create new dashboard
             create_url = f"{HOST}/api/2.0/lakeview/dashboards"
             try:
                 create_resp = requests.post(create_url, headers=HEADERS, json=data)
@@ -134,7 +123,6 @@ def deploy_dashboards(dashboards_dir="dashboards"):
 # -------------------------------
 # Function: Deploy Jobs
 # -------------------------------              
-
 def deploy_jobs():
     """
     Deploys Databricks Jobs defined in JSON files (stored in ./jobs/ directory)
@@ -148,20 +136,17 @@ def deploy_jobs():
     That way, your production Databricks jobs always match what’s defined in Git.
     """
 
-    jobs_dir = Path("./jobs")   # Local folder in your repo where job definitions live
+    jobs_dir = Path("./jobs")
     if not jobs_dir.exists():
         print("ℹ️ No jobs directory found, skipping job deployment")
         return
 
-    # Iterate over all JSON files in ./jobs (each one is a job definition)
     for job_file in jobs_dir.glob("*.json"):
         print(f"Processing job definition: {job_file}")
 
-        # Load the job definition from JSON file (dict structure ready for API)
         with open(job_file, "r", encoding="utf-8") as f:
             job_def = json.load(f)
 
-        # Extract job name (required) from the JSON definition
         job_name = job_def.get("name")
         if not job_name:
             print(f"⚠️ Skipping {job_file}, missing 'name' in job definition")
@@ -171,13 +156,12 @@ def deploy_jobs():
         # 1. Check if a job with the same name already exists in Databricks
         # ------------------------------------------------------------
         resp = requests.get(
-            f"{DATABRICKS_HOST}/api/2.1/jobs/list",
+            f"{HOST}/api/2.1/jobs/list",  # 👈 Use HOST instead of DATABRICKS_HOST
             headers=HEADERS,
         )
         resp.raise_for_status()
         jobs_list = resp.json().get("jobs", [])
 
-        # Try to find an existing job with this exact name
         existing_job = next((j for j in jobs_list if j["settings"]["name"] == job_name), None)
 
         # ------------------------------------------------------------
@@ -187,13 +171,12 @@ def deploy_jobs():
             job_id = existing_job["job_id"]
             print(f"🔄 Updating existing job: {job_name} (id={job_id})")
 
-            # /jobs/update requires you to pass the job_id and the new settings
             update_payload = {
                 "job_id": job_id,
-                "new_settings": job_def  # replace settings with what’s in Git
+                "new_settings": job_def
             }
             resp = requests.post(
-                f"{DATABRICKS_HOST}/api/2.1/jobs/update",
+                f"{HOST}/api/2.1/jobs/update",
                 headers=HEADERS,
                 data=json.dumps(update_payload),
             )
@@ -206,13 +189,12 @@ def deploy_jobs():
         else:
             print(f"➕ Creating new job: {job_name}")
             resp = requests.post(
-                f"{DATABRICKS_HOST}/api/2.1/jobs/create",
+                f"{HOST}/api/2.1/jobs/create",
                 headers=HEADERS,
                 data=json.dumps(job_def),
             )
             resp.raise_for_status()
             print(f"✅ Job created: {job_name}")
-
 
 
 # -------------------------------
