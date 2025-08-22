@@ -4,7 +4,7 @@ name: Deploy to Databricks Prod
 on:
   push:
     branches:
-      - main  # Only run when pushing to main branch (production deployments)
+      - main
 
 jobs:
   deploy:
@@ -28,7 +28,6 @@ jobs:
           host = ${{ secrets.DATABRICKS_HOST }}
           token = ${{ secrets.DATABRICKS_TOKEN }}
           EOF
-
       - name: Deploy notebooks to Databricks
         run: |
           set -euo pipefail
@@ -61,9 +60,9 @@ jobs:
               with open(dashboard_file, 'r') as f:
                   dashboard_data = json.load(f)
 
-              dashboard_data.setdefault("name", os.path.splitext(os.path.basename(dashboard_file))[0])
+              dashboard_data.setdefault("display_name", os.path.splitext(os.path.basename(dashboard_file))[0])
 
-              api_url = f"{host}/api/2.0/sql/dashboards"
+              api_url = f"{host}/api/2.0/lakeview/dashboards"
 
               try:
                   response = requests.post(api_url, headers=headers, json=dashboard_data)
@@ -89,4 +88,5 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
+
 
