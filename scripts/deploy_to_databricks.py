@@ -94,85 +94,46 @@ def deploy_notebooks(notebooks_dir="notebooks"):
 # Function: Deploy Dashboards
 # -------------------------------
 def deploy_dashboards(dashboards_dir="dashboards"):
-    """
-    Deploys Lakeview dashboards using the Databricks REST API.
-    It checks for an existing dashboard and either updates or creates it.
-    """
-    # Find all files with the .lvdash.json extension.
+    """Deploy Lakeview dashboards from JSON files (create or update)."""
     dashboard_files = glob.glob(f"{dashboards_dir}/*.lvdash.json")
-
     if not dashboard_files:
-        print("⚠️ No dashboards found to deploy.")
+        print("⚠️ No dashboards found.")
         return
 
-    # Loop through each dashboard file.
+    session = requests.Session()
+    session.headers.update(HEADERS)
+
+    # Safe request helper
+    def safe_request(method, url, **kwargs):
+        try:
+            resp = session.request(method, url, **kwargs)
+            resp.raise_for_status()
+            return resp
+        except requests.RequestException as e:
+            print(f"❌ {method.upper()} {url} failed: {e}")
+            return None
+
+    # Fetch all existing dashboards once
+    resp = safe_request("get", f"{HOST}/api/2.0/lakeview/dashboards")
+    dashboards = resp.json().get("dashboards", []) if resp else []
+
     for dashboard_file in dashboard_files:
-        print(f"Processing dashboard: {dashboard_file}")
-        
-        # Open and load the JSON content of the dashboard definition file.
+        clean_name = os.path.basename(dashboard_file).replace(".lvdash.json", "")
         with open(dashboard_file, "r") as f:
             data = json.load(f)
 
-        # Extract a clean name by stripping all extensions (.lvdash and .json).
-        # os.path.basename: Gets the filename from the path.
-        # os.path.splitext(...)[0]: Removes the last extension.
-        # The nested calls remove multiple extensions.
-        clean_name = os.path.splitext(os.path.splitext(os.path.basename(dashboard_file))[0])[0]
-        
-        # Modify the loaded JSON data to set the dashboard's display name and parent path.
-        data["display_name"] = clean_name
-        data["parent_path"] = "/Shared"
+        data.update({"display_name": clean_name, "parent_path": "/Shared"})
 
-        try:
-            # Make a GET request to the Databricks API to get a list of all dashboards.
-            resp = requests.get(f"{HOST}/api/2.0/lakeview/dashboards", headers=HEADERS)
-            # This will raise an exception if the HTTP request was not successful (e.g., 404, 500).
-            resp.raise_for_status()
-        except requests.RequestException as e:
-            print(f"⚠️ Failed to list dashboards: {e}")
-            continue # Skip to the next dashboard file.
-
-        # Get the list of dashboards from the JSON response.
-        dashboards = resp.json().get("dashboards", [])
-        
-        # Use a generator expression with `next` to find an existing dashboard with the same display name.
-        # `next` is efficient as it stops searching once a match is found. `None` is the default if no match is found.
         existing = next((d for d in dashboards if d.get("display_name") == clean_name), None)
 
-        # Idempotent logic: Check if the dashboard already exists.
-        if existing:
-            # If it exists, get its unique ID.
-            dash_id = existing.get("dashboard_id")
-            if not dash_id:
-                # If an ID isn't found, skip this dashboard and print a warning.
-                print(f"⚠️ Found dashboard {clean_name} but no dashboard_id. Skipping.")
-                continue
-
-            # Construct the URL for updating a specific dashboard.
-            update_url = f"{HOST}/api/2.0/lakeview/dashboards/{dash_id}"
-            try:
-                # Make a PATCH request to update the dashboard. PATCH is used for partial updates.
-                update_resp = requests.patch(update_url, headers=HEADERS, json=data)
-                if update_resp.status_code == 200:
-                    print(f"✅ Updated dashboard: {clean_name}")
-                else:
-                    print(f"❌ Failed to update {clean_name}: {update_resp.status_code} {update_resp.text}")
-            except requests.RequestException as e:
-                print(f"❌ Exception during update {clean_name}: {e}")
-
+        if existing and existing.get("dashboard_id"):
+            url = f"{HOST}/api/2.0/lakeview/dashboards/{existing['dashboard_id']}"
+            resp = safe_request("patch", url, json=data)
+            print(f"✅ Updated {clean_name}" if resp else f"❌ Failed to update {clean_name}")
         else:
-            # If the dashboard does not exist, create a new one.
-            create_url = f"{HOST}/api/2.0/lakeview/dashboards"
-            try:
-                # Make a POST request to the API to create a new dashboard.
-                create_resp = requests.post(create_url, headers=HEADERS, json=data)
-                # Check for success status codes (200 OK or 201 Created).
-                if create_resp.status_code in [200, 201]:
-                    print(f"✅ Created dashboard: {clean_name}")
-                else:
-                    print(f"❌ Failed to create {clean_name}: {create_resp.status_code} {create_resp.text}")
-            except requests.RequestException as e:
-                print(f"❌ Exception during creation {clean_name}: {e}")
+            url = f"{HOST}/api/2.0/lakeview/dashboards"
+            resp = safe_request("post", url, json=data)
+            print(f"✅ Created {clean_name}" if resp else f"❌ Failed to create {clean_name}")
 
 
 # -------------------------------
@@ -276,6 +237,6 @@ def deploy_jobs():
 # This block ensures that the functions are called only when the script is executed directly.
 if __name__ == "__main__":
     # Call the deployment functions in a logical order.
-    deploy_notebooks()    # Deploy notebooks first
+    # deploy_notebooks()    # Deploy notebooks first
     deploy_dashboards()   # Then deploy dashboards
-    deploy_jobs()         # Finally, deploy jobs
+    # deploy_jobs()         # Finally, deploy jobs
