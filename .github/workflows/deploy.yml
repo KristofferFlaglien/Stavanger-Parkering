@@ -27,7 +27,6 @@ jobs:
       # Step 2: Install necessary Python packages + CLI
       - name: Install dependencies
         run: |
-          pip install --upgrade databricks-cli==0.211.0 requests
           sudo apt-get update
           sudo apt-get install -y jq
           python3 -m pip install --upgrade databricks-cli
@@ -40,6 +39,7 @@ jobs:
           [DEFAULT]
           host = ${{ secrets.DATABRICKS_HOST }}
           token = ${{ secrets.DATABRICKS_TOKEN }}
+          jobs-api-version = 2.1
           EOF
 
 
