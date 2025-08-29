@@ -42,6 +42,7 @@ jobs:
           EOF
           databricks jobs configure --version=2.1
 
+
       # Step 4: Deploy Notebooks (CLI)
       - name: Deploy notebooks
         run: |
@@ -56,6 +57,8 @@ jobs:
       # Step 5: Deploy jobs (create if missing, update if existing)
       - name: Deploy jobs
         run: |
+
+          databricks jobs configure --version=2.1
           all_jobs_json=$(databricks jobs list --output JSON)
           for job_file in jobs/*.json; do
             job_name=$(jq -r '.name' "$job_file")
