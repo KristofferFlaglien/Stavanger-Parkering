@@ -27,6 +27,7 @@ jobs:
       # Step 2: Install necessary Python packages + CLI
       - name: Install dependencies
         run: |
+          pip install --upgrade databricks-cli==0.211.0 requests
           sudo apt-get update
           sudo apt-get install -y jq
           python3 -m pip install --upgrade databricks-cli
@@ -40,7 +41,6 @@ jobs:
           host = ${{ secrets.DATABRICKS_HOST }}
           token = ${{ secrets.DATABRICKS_TOKEN }}
           EOF
-          databricks jobs configure --version=2.1
 
 
       # Step 4: Deploy Notebooks (CLI)
@@ -58,7 +58,6 @@ jobs:
       - name: Deploy jobs
         run: |
 
-          databricks jobs configure --version=2.1
           all_jobs_json=$(databricks jobs list --output JSON)
           for job_file in jobs/*.json; do
             job_name=$(jq -r '.name' "$job_file")
@@ -94,5 +93,4 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
-
 
