@@ -50,6 +50,12 @@ jobs:
             databricks workspace import "$nb" "$target" -f SOURCE -l PYTHON --overwrite
           done
 
+      
+      # Step 4.5: Upgrade Databricks CLI to use Jobs API 2.1
+      - name: Configure Databricks CLI to use Jobs API 2.1
+        run: databricks jobs configure --version=2.1
+
+
       # Step 5: Deploy jobs (create if missing, update if existing)
       - name: Deploy jobs
         run: |
