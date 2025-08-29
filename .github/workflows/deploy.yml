@@ -1,5 +1,6 @@
 # Workflow: Deploy to Databricks Production
 # Triggers when code is pushed to the 'main' branch
+
 name: Deploy to Databricks Prod
 
 on:
@@ -10,8 +11,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest  # Run workflow on latest Ubuntu VM
+
     permissions:
       contents: write  # Required to push git tags
+
     env:
       # Environment variables for Databricks credentials (stored as GitHub secrets)
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
@@ -26,8 +29,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
-          pip install --upgrade databricks-cli
-
+          python3 -m pip install --upgrade databricks-cli
 
       # Step 3: Configure Databricks CLI
       - name: Configure Databricks CLI
@@ -39,30 +41,23 @@ jobs:
           token = ${{ secrets.DATABRICKS_TOKEN }}
           EOF
 
-      
       # Step 4: Deploy Notebooks (CLI)
       - name: Deploy notebooks
         run: |
-           for nb in notebooks/*.ipynb; do
-            target="/Shared/$(basename $nb .ipynb)_prod"
+          for nb in notebooks/*.ipynb; do
+            target="/Shared/$(basename "$nb" .ipynb)_prod"
             echo "Deploying $nb -> $target"
             databricks workspace import "$nb" "$target" -f SOURCE -l PYTHON --overwrite
           done
 
-
-       # Step 5: Deploy jobs (create if missing, update if existing)
+      # Step 5: Deploy jobs (create if missing, update if existing)
       - name: Deploy jobs
         run: |
-          # Fetch all existing jobs once
           all_jobs_json=$(databricks jobs list --output JSON)
-
           for job_file in jobs/*.json; do
             job_name=$(jq -r '.name' "$job_file")
             echo "Processing job: $job_name"
-
-            # Search the cached JSON for the job
             existing_job_id=$(echo "$all_jobs_json" | jq -r ".jobs[] | select(.settings.name==\"$job_name\") | .job_id")
-
             if [ -n "$existing_job_id" ]; then
               echo "Updating existing job: $job_name (id=$existing_job_id)"
               databricks jobs reset --job-id "$existing_job_id" --json-file "$job_file"
@@ -71,7 +66,6 @@ jobs:
               databricks jobs create --json-file "$job_file"
             fi
           done
-
 
       # Step 6: Deploy Dashboards (Python script, REST API)
       - name: Deploy Lakeview dashboards
@@ -94,4 +88,3 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
-
