@@ -40,6 +40,7 @@ jobs:
           host = ${{ secrets.DATABRICKS_HOST }}
           token = ${{ secrets.DATABRICKS_TOKEN }}
           EOF
+          databricks jobs configure --version=2.1
 
       # Step 4: Deploy Notebooks (CLI)
       - name: Deploy notebooks
@@ -50,10 +51,6 @@ jobs:
             databricks workspace import "$nb" "$target" -f SOURCE -l PYTHON --overwrite
           done
 
-      
-      # Step 4.5: Upgrade Databricks CLI to use Jobs API 2.1
-      - name: Configure Databricks CLI to use Jobs API 2.1
-        run: databricks jobs configure --version=2.1
 
 
       # Step 5: Deploy jobs (create if missing, update if existing)
