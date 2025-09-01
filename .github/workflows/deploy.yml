@@ -55,6 +55,7 @@ jobs:
             databricks workspace import "$nb" "$target" -f SOURCE -l PYTHON --overwrite
           done
 
+
       # Step 5: Deploy jobs (create if missing, update if existing)
       - name: Deploy jobs
         run: |
@@ -68,8 +69,8 @@ jobs:
             echo "Processing job defined in file: $job_file"
             echo "  Expected job name: '$job_name'"
             
-            # Use the jq query for API 2.1 format
-            existing_job_id=$(echo "$all_jobs_json" | jq -r ".jobs[] | select(.settings.name==\"$job_name\") | .job_id")
+            # Modify jq query to select only the first job ID found
+            existing_job_id=$(echo "$all_jobs_json" | jq -r ".jobs[] | select(.settings.name==\"$job_name\") | .job_id" | head -n 1)
             echo "  Found existing job ID: '$existing_job_id'"
 
             if [ -n "$existing_job_id" ] && [ "$existing_job_id" != "null" ]; then
