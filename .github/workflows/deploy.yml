@@ -68,8 +68,8 @@ jobs:
             echo "Processing job defined in file: $job_file"
             echo "  Expected job name: '$job_name'"
             
-            # Corrected jq query for API 2.0 format
-            existing_job_id=$(echo "$all_jobs_json" | jq -r ".[] | select(.settings.name==\"$job_name\") | .job_id")
+            # Use the jq query for API 2.1 format
+            existing_job_id=$(echo "$all_jobs_json" | jq -r ".jobs[] | select(.settings.name==\"$job_name\") | .job_id")
             echo "  Found existing job ID: '$existing_job_id'"
 
             if [ -n "$existing_job_id" ] && [ "$existing_job_id" != "null" ]; then
