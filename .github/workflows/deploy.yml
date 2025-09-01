@@ -35,7 +35,7 @@ jobs:
       - name: Configure Databricks CLI
         run: |
           mkdir -p ~/.databricks
-          cat > ~/.databrickscfg << EOF
+          cat > ~/.databrickscfg <<EOF
 [DEFAULT]
 host = ${{ secrets.DATABRICKS_HOST }}
 token = ${{ secrets.DATABRICKS_TOKEN }}
@@ -91,5 +91,3 @@ EOF
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
-
-
