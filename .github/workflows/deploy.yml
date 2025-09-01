@@ -58,7 +58,6 @@ jobs:
       # Step 5: Deploy jobs (create if missing, update if existing)
       - name: Deploy jobs
         run: |
-          # Debugging: Get and print all jobs from Databricks
           all_jobs_json=$(databricks jobs list --output JSON)
           echo "--- All Existing Databricks Jobs (JSON) ---"
           echo "$all_jobs_json"
@@ -69,8 +68,8 @@ jobs:
             echo "Processing job defined in file: $job_file"
             echo "  Expected job name: '$job_name'"
             
-            # Debugging: Use jq to try and find the job ID
-            existing_job_id=$(echo "$all_jobs_json" | jq -r ".jobs[] | select(.name==\"$job_name\") | .job_id")
+            # Corrected jq query for API 2.0 format
+            existing_job_id=$(echo "$all_jobs_json" | jq -r ".[] | select(.settings.name==\"$job_name\") | .job_id")
             echo "  Found existing job ID: '$existing_job_id'"
 
             if [ -n "$existing_job_id" ] && [ "$existing_job_id" != "null" ]; then
@@ -103,4 +102,3 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
-
