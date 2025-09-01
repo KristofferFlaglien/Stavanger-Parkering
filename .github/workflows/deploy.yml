@@ -29,7 +29,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
-          python3 -m pip install --upgrade databricks-sdk
+          python3 -m pip install --upgrade databricks-cli
 
       # Step 3: Configure Databricks CLI
       - name: Configure Databricks CLI
@@ -57,21 +57,21 @@ jobs:
       # Step 5: Deploy jobs (create if missing, update if existing)
       - name: Deploy jobs
         run: |
-          # Loop through all job configuration files
           for job_file in jobs/*.json; do
             job_name=$(jq -r '.name' "$job_file")
             echo "Processing job: $job_name"
 
-            # Try to update the job first.
-            # The '||' operator executes the next command only if the first one fails.
+            existing_job_id=$(databricks jobs list --output JSON | jq -r ".jobs[] | select(.settings.name==\"$job_name\") | .job_id")
 
-            databricks jobs update --json-file "$job_file" || {
-              # If update fails, it means the job doesn't exist. So, create it.
-
-              echo "Job '$job_name' not found. Creating a new job."
+            if [ -n "$existing_job_id" ]; then
+              echo "Updating existing job: $job_name (id=$existing_job_id)"
+              databricks jobs reset --job-id "$existing_job_id" --json-file "$job_file"
+            else
+              echo "Creating new job: $job_name"
               databricks jobs create --json-file "$job_file"
-            }
+            fi
           done
+
 
       # Step 6: Deploy Dashboards (Python script, REST API)
       - name: Deploy Lakeview dashboards
@@ -94,5 +94,7 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
+
+
 
 
