@@ -1,4 +1,3 @@
-
 # Workflow: Deploy to Databricks Production
 # Triggers when code is pushed to the 'main' branch
 #m
@@ -59,12 +58,20 @@ jobs:
       # Step 5: Deploy jobs (create if missing, update if existing)
       - name: Deploy jobs
         run: |
+          # Debugging: Get and print all jobs from Databricks
           all_jobs_json=$(databricks jobs list --output JSON)
+          echo "--- All Existing Databricks Jobs (JSON) ---"
+          echo "$all_jobs_json"
+          echo "-------------------------------------------"
+
           for job_file in jobs/*.json; do
             job_name=$(jq -r '.name' "$job_file")
-            echo "Processing job: $job_name"
-
-            existing_job_id=$(echo "$all_jobs_json" | jq -r ".jobs[] | select(.name | ascii_downcase == \"${job_name,,}\") | .job_id")
+            echo "Processing job defined in file: $job_file"
+            echo "  Expected job name: '$job_name'"
+            
+            # Debugging: Use jq to try and find the job ID
+            existing_job_id=$(echo "$all_jobs_json" | jq -r ".jobs[] | select(.name==\"$job_name\") | .job_id")
+            echo "  Found existing job ID: '$existing_job_id'"
 
             if [ -n "$existing_job_id" ] && [ "$existing_job_id" != "null" ]; then
               echo "Updating existing job: $job_name (id=$existing_job_id)"
@@ -96,3 +103,4 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: echo "❌ Deployment to production failed!"
+
