@@ -35,14 +35,15 @@ jobs:
       - name: Configure Databricks CLI
         run: |
           mkdir -p ~/.databricks
-          cat > ~/.databrickscfg <<EOF
-[DEFAULT]
-host = ${{ secrets.DATABRICKS_HOST }}
-token = ${{ secrets.DATABRICKS_TOKEN }}
-jobs-api-version = 2.1
-EOF
+          cat > ~/.databrickscfg << 'EOF'
+          [DEFAULT]
+          host = ${{ secrets.DATABRICKS_HOST }}
+          token = ${{ secrets.DATABRICKS_TOKEN }}
+          jobs-api-version = 2.1
+          EOF
           # Ensure CLI uses the new Jobs API
           databricks jobs configure --version=2.1
+
 
       # Step 4: Deploy Notebooks (CLI)
       - name: Deploy notebooks
