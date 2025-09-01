@@ -62,7 +62,7 @@ jobs:
           for job_file in jobs/*.json; do
             job_name=$(jq -r '.name' "$job_file")
             echo "Processing job: $job_name"
-            existing_job_id=$(echo "$all_jobs_json" | jq -r ".jobs[] | select(.name==\"$job_name\") | .job_id")
+            existing_job_id=$(echo "$all_jobs_json" | jq -r ".jobs[] | select(.name | ascii_downcase == \"${job_name,,}\") | .job_id")
             if [ -n "$existing_job_id" ] && [ "$existing_job_id" != "null" ]; then
               echo "Updating existing job: $job_name (id=$existing_job_id)"
               databricks jobs reset --job-id "$existing_job_id" --json-file "$job_file"
