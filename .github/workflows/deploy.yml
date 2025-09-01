@@ -64,8 +64,10 @@ jobs:
 
             # Try to update the job first.
             # The '||' operator executes the next command only if the first one fails.
+
             databricks jobs update --json-file "$job_file" || {
               # If update fails, it means the job doesn't exist. So, create it.
+
               echo "Job '$job_name' not found. Creating a new job."
               databricks jobs create --json-file "$job_file"
             }
