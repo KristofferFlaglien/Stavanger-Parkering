@@ -2,8 +2,6 @@
 # Triggers when code is pushed to the 'main' branch
 #v
 
-
-
 name: Deploy to Databricks Prod
 
 on:
@@ -60,18 +58,35 @@ jobs:
       # Step 5: Deploy jobs (create if missing, update if existing)
       - name: Deploy jobs
         run: |
+          # Loop through all JSON files in the 'jobs' directory.
+          # Each JSON file is expected to define a single Databricks job.
           for job_file in jobs/*.json; do
+            
+            # Use 'jq' to extract the job's name from the current JSON file.
+            # The '-r' flag ensures the output is a raw string without extra quotes.
             job_name=$(jq -r '.name' "$job_file")
 
-            # Query for a single job by name. This is more reliable as it doesn't depend on a full job list.
-            # The '--jobs-api-version' flag is for the top-level configuration, not a sub-command.
+            # The core logic: check if a job with the same name already exists in Databricks.
+            # 1. 'databricks jobs list --output JSON': Retrieves a list of all jobs in the workspace as a JSON object.
+            # 2. '|': Pipes the JSON output to the next command, 'jq'.
+            # 3. 'jq -r ".jobs[] | select(.settings.name==\"$job_name\") | .job_id"':
+            #    - ".jobs[]": Navigates into the 'jobs' array to process each job object.
+            #    - "select(.settings.name==\"$job_name\")": Filters the list to find jobs where the 'name' field
+            #      inside the 'settings' object matches the job name from our file.
+            #    - ".job_id": Extracts the unique ID of the matching job.
+            # 4. '| head -n 1': A safety measure to take only the first matching job ID. This is crucial
+            #    to handle potential duplicates and ensures a single ID is passed to the next command.
             existing_job_id=$(databricks jobs list --output JSON | jq -r ".jobs[] | select(.settings.name==\"$job_name\") | .job_id" | head -n 1)
 
+            # Conditional check: if a job ID was found, update the existing job; otherwise, create a new one.
+            # The '-n' flag checks if the string is non-empty. We also check for the literal string "null".
             if [ -n "$existing_job_id" ] && [ "$existing_job_id" != "null" ]; then
               echo "Updating existing job: $job_name (id=$existing_job_id)"
+              # 'databricks jobs reset' updates an existing job using its ID and a new JSON file.
               databricks jobs reset --job-id "$existing_job_id" --json-file "$job_file"
             else
               echo "Creating new job: $job_name"
+              # 'databricks jobs create' creates a new job from a JSON file.
               databricks jobs create --json-file "$job_file"
             fi
           done
